@@ -1,19 +1,27 @@
 from bs4 import BeautifulSoup as bs
 import requests
-
-url = 'https://euroauto.ru/zapchasti/dvigatel/absorber_filtr_ugolniy/?page='
+import re
+url = 'https://euroauto.ru/part/used/30187637/'
 MAIN_CARD_URL = 'https://euroauto.ru'
 
 
 
 
-for i in range(1, 57):
-    response = requests.get(url + str(i))
-    soup = bs(response.content, 'html.parser')
-    card_list = soup.find_all('div', class_='snippet-card fx-box')
-    print(response.status_code)
-    for card in card_list:
-        href = card.find('a', class_='lightweight-item-desc desc-item--link')['href']
-        print(MAIN_CARD_URL + href)
 
+response = requests.get(url)
+soup = bs(response.content, 'html.parser')
+container = soup.find_all('div', class_='col-md-4 col-lg-4')[1]
+# for div in container:
+#     if div.find('label').text == 'Вес:':
+#         weight = div.text.strip()
+#         white_clear = re.search(r'[0-9.,]+', weight)[0]
+# print(white_clear)
 
+for div in container:
+    label = div.find('label')
+    if type(label) != int:
+        try:
+            if label.text == 'Вес:':
+                print(div.text)
+        except:
+            pass

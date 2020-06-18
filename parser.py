@@ -3,21 +3,31 @@ import requests
 from user_agent import generate_user_agent
 import time
 import random
+import re
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
+from model import *
+from user_agent import generate_user_agent
+import re
+import os
 
 
+error_count = 0
+db_engine = create_engine("sqlite:///euroauto.db", echo=True)
+basedir = os.path.abspath(os.path.dirname(__file__))
+SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'euroauto.db')
 MAIN_CARD_URL = 'https://euroauto.ru'
 HEADERS = {
     'User-Agent': generate_user_agent(device_type="desktop", os=('mac', 'linux')),
 }
-proxy = {'HTTPS': '157.245.138.230:8118'}
-card_list = []
+#proxy = {'HTTPS': '157.245.138.230:8118'}
 cat_url = 'https://euroauto.ru/zapchasti/dvigatel/absorber_filtr_ugolniy/?page='
-
+cat_main_url = 'https://euroauto.ru/zapchasti/dvigatel/absorber_filtr_ugolniy/?page=1'
 def get_html(url):
     while True:
         HEADERS.update({'User-Agent': generate_user_agent(device_type="desktop", os=('mac', 'linux'))})
         #time.sleep(random.randint(random.randint(6, 10), random.randint(12, 27)))
-        response = requests.get(url, headers=HEADERS, proxies=proxy)
+        response = requests.get(url, headers=HEADERS)
         if response.status_code == 200:
             print(response.status_code)
             return response
@@ -38,20 +48,58 @@ def get_page_count(response):
     return int(page_count)
 
 
-def get_list_url(response):
+def get_list_url():
+    result = []
+    page_count = get_page_count(get_html(cat_main_url))
+    for i in range(1, page_count + 1):
+        response = get_html(cat_url + str(i))
+        soup = bs(response.content, 'html.parser')
+        card_list = soup.find_all('div', class_='snippet-card fx-box')
+        for card in card_list:
+            href = card.find('a', class_='lightweight-item-desc')['href']
+            full_url = MAIN_CARD_URL + href
+            print(full_url)
+            result.append(full_url)
+    return result
+
+
+def parser_card(response):
     soup = bs(response.content, 'html.parser')
-    card_list = soup.find_all('div', class_='snippet-card fx-box')
-    for card in card_list:
-        href = card.find('a', class_='lightweight-item-desc desc-item--link')['href']
-        print(href)
-        card_list.append(MAIN_CARD_URL + href)
+    container = soup.find_all('div', class_='col-md-4 col-lg-4')[1]
+    try:
+        name = container.find('a').find('span')['data-product-title'].strip()
+    except:
+        name = None
+    try:
+        article = container.find('a').text.strip()
+    except:
+        article = None
+    try:
+        brand = container.find_all('div')[2].find('a').text
+    except:
+        brand = None
+    try:
+        weight = container.find_all('div')[4].text.strip()
+        white_clear = re.search(r'[0-9.,]+', weight)[0]
+    except:
+        white_clear = None
+    url = response.url
+    Session = sessionmaker(bind=db_engine)
+    session = Session()
+    new_element = EuroAuto(name, article, brand, white_clear, url)
+    session.add(new_element)
+    session.commit()
+
+
 
 
 def main():
-    page_count = get_page_count(get_html('https://euroauto.ru/zapchasti/dvigatel/absorber_filtr_ugolniy/?page=1'))
-    for i in range(1, page_count + 1):
-        print(cat_url + str(i))
-        #get_list_url(get_html(cat_url + str(i)))
+    card_list = get_list_url()
+    for url in card_list:
+        response = get_html(url)
+        parser_card(response)
+
+
 
 
 
