@@ -21,8 +21,8 @@ HEADERS = {
     'User-Agent': generate_user_agent(device_type="desktop", os=('mac', 'linux')),
 }
 #proxy = {'HTTPS': '157.245.138.230:8118'}
-cat_url = 'https://euroauto.ru/zapchasti/dvigatel/absorber_filtr_ugolniy/?page='
-cat_main_url = 'https://euroauto.ru/zapchasti/dvigatel/absorber_filtr_ugolniy/?page=1'
+cat_url = 'https://euroauto.ru/zapchasti/podveska_perednih_kolyos/amortizator_peredniy/?page='
+cat_main_url = 'https://euroauto.ru/zapchasti/podveska_perednih_kolyos/amortizator_peredniy/'
 def get_html(url):
     while True:
         HEADERS.update({'User-Agent': generate_user_agent(device_type="desktop", os=('mac', 'linux'))})
@@ -78,10 +78,21 @@ def parser_card(response):
         brand = container.find_all('div')[2].find('a').text
     except:
         brand = None
-    try:
-        weight = container.find_all('div')[4].text.strip()
-        white_clear = re.search(r'[0-9.,]+', weight)[0]
-    except:
+
+    for div in container:
+        label = div.find('label')
+        if type(label) != int:
+            try:
+                if label.text == 'Вес:':
+                    weight = div.text
+                    white_clear = re.search(r'[0-9.]+', weight)[0]
+            except:
+                white_clear = None
+    # из за того что верстка в разных категориях разная сделал новый код для парсинга веса, этот пока не нужен
+    # try:
+    #     weight = container.find_all('div')[4].text.strip()
+    #     white_clear = re.search(r'[0-9.,]+', weight)[0]
+    # except:
         white_clear = None
     url = response.url
     Session = sessionmaker(bind=db_engine)
